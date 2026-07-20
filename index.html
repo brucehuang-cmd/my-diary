@@ -95,7 +95,7 @@
   .panel.active { display: block; }
   .form-group { margin-bottom: 18px; }
   label { display: block; margin-bottom: 6px; font-weight: 600; color: var(--text-soft); }
-  input[type="text"], input[type="date"], input[type="password"], textarea, select {
+  input[type="text"], input[type="email"], input[type="date"], input[type="password"], textarea, select {
     width: 100%; padding: 10px 12px;
     border: 2px solid var(--border); border-radius: 8px;
     font-size: 1em; font-family: inherit;
@@ -205,6 +205,45 @@
     transition: opacity 0.3s; font-size: 0.9em;
   }
   .toast.show { opacity: 1; }
+  /* 认证界面 */
+  .auth-screen {
+    position: fixed; inset: 0; background: var(--bg-grad);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 998; color: #fff;
+  }
+  .auth-box {
+    background: #fff; color: #333;
+    border-radius: 16px; padding: 35px 30px;
+    width: 420px; max-width: 92vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .auth-box h2 { text-align: center; color: var(--primary); margin-bottom: 5px; }
+  .auth-box p { text-align: center; color: var(--text-muted); font-size: 0.85em; margin-bottom: 25px; }
+  .auth-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .auth-tab {
+    flex: 1; padding: 10px; border: 2px solid var(--border);
+    background: #fff; color: var(--text-soft); border-radius: 8px;
+    cursor: pointer; font-size: 0.95em; transition: all 0.2s;
+  }
+  .auth-tab.active { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: bold; }
+  .auth-box input { margin-bottom: 12px; width: 100%; box-sizing: border-box; }
+  .auth-box .btn-primary { width: 100%; margin-top: 5px; box-sizing: border-box; }
+  .auth-error { color: #e53e3e; font-size: 0.85em; text-align: center; min-height: 1.2em; margin-bottom: 8px; }
+  .user-info {
+    position: absolute; top: 30px; right: 60px;
+    background: rgba(255,255,255,0.2); color: #fff;
+    padding: 6px 14px; border-radius: 20px; font-size: 0.8em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .user-info button { background: rgba(255,255,255,0.2); border: none; color: #fff; cursor: pointer; padding: 2px 8px; border-radius: 10px; font-size: 0.9em; }
+  .pwd-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 1.1em; user-select: none; }
+  .auth-links { text-align: center; margin-top: 15px; }
+  .auth-links a { color: var(--primary); font-size: 0.85em; text-decoration: none; }
+  .auth-links a:hover { text-decoration: underline; }
+  .auth-loading { display: flex; justify-content: center; margin-top: 15px; }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .auth-box .form-group { margin-bottom: 14px; }
 </style>
 </head>
 <body>
@@ -220,6 +259,42 @@
 <!-- 提示 -->
 <div class="toast" id="toast"></div>
 
+<!-- 登录/注册界面 -->
+<div class="auth-screen" id="authScreen" style="display:none">
+  <div class="auth-box">
+    <h2>📖 我的日记本</h2>
+    <p>记录每一天的心情与故事</p>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin" onclick="switchAuth('login')">登录</button>
+      <button class="auth-tab" id="tabSignup" onclick="switchAuth('signup')">注册</button>
+    </div>
+    <div class="form-group">
+      <input type="email" id="authEmail" placeholder="📧 邮箱" onkeydown="if(event.key==='Enter')doAuth()">
+    </div>
+    <div class="form-group" style="position:relative">
+      <input type="password" id="authPassword" placeholder="🔒 密码（至少6位）" onkeydown="if(event.key==='Enter')doAuth()">
+      <span class="pwd-toggle" onclick="togglePwd('authPassword',this)">👁️</span>
+    </div>
+    <div class="form-group" id="confirmGroup" style="position:relative;display:none">
+      <input type="password" id="authConfirm" placeholder="🔒 确认密码" onkeydown="if(event.key==='Enter')doAuth()">
+      <span class="pwd-toggle" onclick="togglePwd('authConfirm',this)">👁️</span>
+    </div>
+    <div class="auth-error" id="authError"></div>
+    <button class="btn-primary" onclick="doAuth()" id="authBtn">登录</button>
+    <div class="auth-links">
+      <a href="#" id="forgotLink" onclick="showForgot();return false">忘记密码？</a>
+      <a href="#" id="resendLink" onclick="resendConfirm();return false" style="display:none">没收到确认邮件？</a>
+    </div>
+    <div id="forgotBox" style="display:none;margin-top:15px">
+      <input type="email" id="forgotEmail" placeholder="📧 输入注册邮箱">
+      <button class="btn-secondary" style="width:100%;margin-left:0;margin-top:8px" onclick="sendReset()">发送重置邮件</button>
+    </div>
+    <div class="auth-loading" id="authLoading" style="display:none">
+      <div class="spinner"></div>
+    </div>
+  </div>
+</div>
+
 <div class="container">
   <header>
     <div class="sync-status" id="syncStatus">
@@ -229,6 +304,10 @@
     <h1>📖 我的日记本</h1>
     <p>记录每一天的心情与故事 · 云端同步</p>
     <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
+    <div class="user-info" id="userInfo" style="display:none">
+      <span id="userEmail"></span>
+      <button onclick="doLogout()">退出</button>
+    </div>
   </header>
 
   <div class="tabs">
@@ -378,6 +457,8 @@ const SUPABASE_URL = 'https://dubochnyhmfpiedwtfdk.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_h5IvidC9ugMcMD5ipm_LuQ_DWtR6Ozp';
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const TABLE = 'diaries';
+let currentUser = null;
+let authMode = 'login';
 
 // ===== 状态 =====
 let diaries = JSON.parse(localStorage.getItem('diaries') || '[]');
@@ -387,6 +468,176 @@ let selectedWeather = '';
 let currentTags = [];
 let calDate = new Date();
 let isOnline = navigator.onLine;
+
+// ===== 认证 =====
+function switchAuth(mode) {
+  authMode = mode;
+  document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
+  document.getElementById('tabSignup').classList.toggle('active', mode === 'signup');
+  document.getElementById('authBtn').textContent = mode === 'login' ? '登录' : '注册';
+  document.getElementById('confirmGroup').style.display = mode === 'signup' ? 'block' : 'none';
+  document.getElementById('forgotLink').style.display = mode === 'login' ? 'inline' : 'none';
+  document.getElementById('authError').textContent = '';
+  document.getElementById('authError').style.color = '#e53e3e';
+  document.getElementById('forgotBox').style.display = 'none';
+}
+
+function togglePwd(id, el) {
+  const inp = document.getElementById(id);
+  if (inp.type === 'password') { inp.type = 'text'; el.textContent = '🙈'; }
+  else { inp.type = 'password'; el.textContent = '👁️'; }
+}
+
+function showForgot() {
+  document.getElementById('forgotBox').style.display = 'block';
+  document.getElementById('forgotEmail').focus();
+}
+
+function setAuthLoading(loading) {
+  document.getElementById('authLoading').style.display = loading ? 'flex' : 'none';
+  document.getElementById('authBtn').disabled = loading;
+  document.getElementById('authBtn').style.opacity = loading ? '0.6' : '1';
+}
+
+async function doAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const confirm = document.getElementById('authConfirm').value;
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  errEl.style.color = '#e53e3e';
+
+  // 验证
+  if (!email) { errEl.textContent = '请输入邮箱'; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.textContent = '邮箱格式不正确'; return; }
+  if (!password) { errEl.textContent = '请输入密码'; return; }
+  if (password.length < 6) { errEl.textContent = '密码至少6位'; return; }
+  if (authMode === 'signup' && password !== confirm) { errEl.textContent = '两次密码不一致'; return; }
+
+  setAuthLoading(true);
+  document.getElementById('authBtn').textContent = '处理中...';
+
+  try {
+    if (authMode === 'signup') {
+      const { data, error } = await sbClient.auth.signUp({ email, password });
+      if (error) throw error;
+      if (data.user && !data.session) {
+        errEl.style.color = '#38a169';
+        errEl.textContent = '✅ 注册成功！请检查邮箱确认后登录';
+        document.getElementById('resendLink').style.display = 'inline';
+        document.getElementById('authBtn').textContent = '登录';
+        switchAuth('login');
+        document.getElementById('authPassword').value = '';
+        setAuthLoading(false);
+        return;
+      }
+      // 如果不需要邮箱确认，直接登录
+      showToast('✅ 注册成功！');
+    } else {
+      const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
+      if (error) {
+        if (error.message.includes('Email not confirmed')) {
+          errEl.textContent = '邮箱未确认，请检查邮件';
+          document.getElementById('resendLink').style.display = 'inline';
+        } else if (error.message.includes('Invalid login')) {
+          errEl.textContent = '邮箱或密码错误';
+        } else {
+          throw error;
+        }
+        setAuthLoading(false);
+        document.getElementById('authBtn').textContent = '登录';
+        return;
+      }
+    }
+    await checkAuth();
+  } catch (e) {
+    let msg = e.message || '操作失败';
+    if (msg.includes('already registered')) msg = '该邮箱已注册，请直接登录';
+    if (msg.includes('rate limit')) msg = '操作太频繁，请稍后再试';
+    errEl.textContent = '❌ ' + msg;
+    document.getElementById('authBtn').textContent = authMode === 'login' ? '登录' : '注册';
+    setAuthLoading(false);
+  }
+}
+
+async function resendConfirm() {
+  const email = document.getElementById('authEmail').value.trim();
+  if (!email) { showToast('请先输入邮箱'); return; }
+  setAuthLoading(true);
+  try {
+    const { error } = await sbClient.auth.resend({ type: 'signup', email });
+    if (error) throw error;
+    showToast('✅ 确认邮件已重新发送');
+  } catch (e) {
+    showToast('❌ ' + e.message);
+  }
+  setAuthLoading(false);
+}
+
+async function sendReset() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  const errEl = document.getElementById('authError');
+  if (!email) { errEl.textContent = '请输入邮箱'; return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.textContent = '邮箱格式不正确'; return; }
+  setAuthLoading(true);
+  try {
+    const { error } = await sbClient.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.href
+    });
+    if (error) throw error;
+    errEl.style.color = '#38a169';
+    errEl.textContent = '✅ 重置邮件已发送，请检查邮箱';
+    document.getElementById('forgotBox').style.display = 'none';
+  } catch (e) {
+    errEl.textContent = '❌ ' + e.message;
+  }
+  setAuthLoading(false);
+}
+
+async function checkAuth() {
+  const { data: { session } } = await sbClient.auth.getSession();
+  if (session && session.user) {
+    currentUser = session.user;
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('userInfo').style.display = 'flex';
+    document.getElementById('userEmail').textContent = currentUser.email;
+    await syncFromCloud();
+  } else {
+    showAuthScreen();
+  }
+}
+
+function showAuthScreen() {
+  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('userInfo').style.display = 'none';
+  diaries = [];
+  localStorage.setItem('diaries', '[]');
+  setAuthLoading(false);
+}
+
+async function doLogout() {
+  if (!confirm('确定退出登录吗？')) return;
+  await sbClient.auth.signOut();
+  currentUser = null;
+  showAuthScreen();
+  document.getElementById('authEmail').value = '';
+  document.getElementById('authPassword').value = '';
+  document.getElementById('authConfirm').value = '';
+  showToast('已退出登录');
+}
+
+// 监听认证状态变化
+sbClient.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT') {
+    currentUser = null;
+    showAuthScreen();
+  } else if (event === 'SIGNED_IN' && session) {
+    currentUser = session.user;
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('userInfo').style.display = 'flex';
+    document.getElementById('userEmail').textContent = currentUser.email;
+  }
+});
 
 // ===== 同步状态指示 =====
 function setSyncStatus(state, text) {
@@ -535,6 +786,7 @@ function switchTab(tab, btn) {
 
 // ===== 云端同步 =====
 async function syncFromCloud() {
+  if (!currentUser) { setSyncStatus('offline', '未登录'); return; }
   setSyncStatus('syncing', '从云端拉取...');
   try {
     const { data, error } = await sbClient.from(TABLE).select('*').order('date', { ascending: false });
@@ -543,7 +795,8 @@ async function syncFromCloud() {
       diaries = data.map(d => ({
         id: d.id, date: d.date, title: d.title, content: d.content,
         mood: d.mood, weather: d.weather, tags: d.tags || [],
-        pinned: d.pinned || false, created: d.created, updated: d.updated
+        pinned: d.pinned || false, created: d.created, updated: d.updated,
+        user_id: currentUser.id
       }));
       localStorage.setItem('diaries', JSON.stringify(diaries));
     }
@@ -602,6 +855,7 @@ function renderCloudInfo() {
 
 // ===== 保存 =====
 async function saveDiary() {
+  if (!currentUser) { showToast('请先登录'); showAuthScreen(); return; }
   const date = document.getElementById('diary-date').value;
   const title = document.getElementById('diary-title').value.trim();
   const content = document.getElementById('diary-content').value.trim();
@@ -609,12 +863,12 @@ async function saveDiary() {
 
   setSyncStatus('syncing', '保存中...');
   if (editingId !== null) {
-    const updated = { ...diaries[editingId], date, title, content, mood: selectedMood, weather: selectedWeather, tags: currentTags, updated: new Date().toISOString() };
+    const updated = { ...diaries[editingId], date, title, content, mood: selectedMood, weather: selectedWeather, tags: currentTags, updated: new Date().toISOString(), user_id: currentUser.id };
     diaries[editingId] = updated;
     await saveToCloud(updated);
     editingId = null;
   } else {
-    const newDiary = { id: Date.now(), date, title, content, mood: selectedMood, weather: selectedWeather, tags: currentTags, pinned: false, created: new Date().toISOString() };
+    const newDiary = { id: Date.now(), date, title, content, mood: selectedMood, weather: selectedWeather, tags: currentTags, pinned: false, created: new Date().toISOString(), user_id: currentUser.id };
     diaries.push(newDiary);
     await saveToCloud(newDiary);
   }
@@ -861,8 +1115,8 @@ window.addEventListener('offline', () => { isOnline = false; setSyncStatus('offl
 
 // ===== 初始化 =====
 loadDraft();
-// 启动时从云端拉取
-syncFromCloud();
+// 启动时检查登录状态
+checkAuth();
 </script>
 </body>
 </html>
