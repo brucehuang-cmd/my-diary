@@ -244,6 +244,21 @@
   .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .auth-box .form-group { margin-bottom: 14px; }
+  /* 昵称弹窗 */
+  .nickname-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1001;
+  }
+  .nickname-box {
+    background: #fff; border-radius: 16px; padding: 35px 30px;
+    width: 400px; max-width: 90vw; text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .nickname-box h2 { color: var(--primary); margin-bottom: 8px; }
+  .nickname-box p { color: var(--text-muted); font-size: 0.85em; margin-bottom: 20px; }
+  .nickname-box input { margin-bottom: 15px; }
+  .nickname-box .btn-primary { width: 100%; box-sizing: border-box; }
 </style>
 </head>
 <body>
@@ -295,17 +310,28 @@
   </div>
 </div>
 
+<!-- 昵称设置弹窗 -->
+<div class="nickname-modal" id="nicknameModal" style="display:none">
+  <div class="nickname-box">
+    <h2>👋 欢迎使用</h2>
+    <p>请输入你的昵称，让大家认识你</p>
+    <input type="text" id="nicknameInput" placeholder="你的昵称（如：小明）" maxlength="20" onkeydown="if(event.key==='Enter')saveNickname()">
+    <button class="btn-primary" onclick="saveNickname()">确定</button>
+  </div>
+</div>
+
 <div class="container">
   <header>
     <div class="sync-status" id="syncStatus">
       <div class="sync-dot syncing" id="syncDot"></div>
       <span id="syncText">同步中...</span>
     </div>
-    <h1>📖 我的日记本</h1>
+    <h1 id="diaryTitle">📖 我的日记本</h1>
     <p>记录每一天的心情与故事 · 云端同步</p>
     <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
     <div class="user-info" id="userInfo" style="display:none">
-      <span id="userEmail"></span>
+      <span id="userDisplay"></span>
+      <button onclick="editNickname()" title="修改昵称">✏️</button>
       <button onclick="doLogout()">退出</button>
     </div>
   </header>
@@ -459,6 +485,7 @@ const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const TABLE = 'diaries';
 let currentUser = null;
 let authMode = 'login';
+let userNickname = '';
 
 // ===== 状态 =====
 let diaries = JSON.parse(localStorage.getItem('diaries') || '[]');
@@ -600,11 +627,57 @@ async function checkAuth() {
     currentUser = session.user;
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('userInfo').style.display = 'flex';
-    document.getElementById('userEmail').textContent = currentUser.email;
+    // 获取昵称
+    userNickname = currentUser.user_metadata?.nickname || localStorage.getItem('nickname_' + currentUser.id) || '';
+    updateDisplayName();
+    // 没有昵称就弹窗
+    if (!userNickname) {
+      showNicknameModal();
+    }
     await syncFromCloud();
   } else {
     showAuthScreen();
   }
+}
+
+function updateDisplayName() {
+  const title = document.getElementById('diaryTitle');
+  const display = document.getElementById('userDisplay');
+  if (userNickname) {
+    title.textContent = `📖 ${userNickname}的日记本`;
+    display.textContent = userNickname;
+  } else {
+    title.textContent = '📖 我的日记本';
+    display.textContent = currentUser ? currentUser.email : '';
+  }
+}
+
+function showNicknameModal() {
+  document.getElementById('nicknameInput').value = userNickname || '';
+  document.getElementById('nicknameModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('nicknameInput').focus(), 100);
+}
+
+function hideNicknameModal() {
+  document.getElementById('nicknameModal').style.display = 'none';
+}
+
+async function saveNickname() {
+  const name = document.getElementById('nicknameInput').value.trim();
+  if (!name) { showToast('请输入昵称'); return; }
+  userNickname = name;
+  localStorage.setItem('nickname_' + currentUser.id, name);
+  // 保存到 Supabase 用户信息
+  try {
+    await sbClient.auth.updateUser({ data: { nickname: name } });
+  } catch(e) {}
+  updateDisplayName();
+  hideNicknameModal();
+  showToast('✅ 昵称已设置');
+}
+
+function editNickname() {
+  showNicknameModal();
 }
 
 function showAuthScreen() {
@@ -630,12 +703,17 @@ async function doLogout() {
 sbClient.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_OUT') {
     currentUser = null;
+    userNickname = '';
     showAuthScreen();
   } else if (event === 'SIGNED_IN' && session) {
     currentUser = session.user;
+    userNickname = session.user.user_metadata?.nickname || localStorage.getItem('nickname_' + session.user.id) || '';
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('userInfo').style.display = 'flex';
-    document.getElementById('userEmail').textContent = currentUser.email;
+    updateDisplayName();
+    if (!userNickname) {
+      showNicknameModal();
+    }
   }
 });
 
