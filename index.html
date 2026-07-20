@@ -875,6 +875,24 @@ async function searchFriend() {
 
 // 发送好友请求
 async function sendFriendRequest(targetId) {
+  // 检查是否已存在关系
+  try {
+    const [sent, received] = await Promise.all([
+      sbClient.from('friendships').select('*').eq('requester_id', currentUser.id).eq('addressee_id', targetId),
+      sbClient.from('friendships').select('*').eq('requester_id', targetId).eq('addressee_id', currentUser.id)
+    ]);
+    const existing = [...(sent.data||[]), ...(received.data||[])];
+    if (existing.length > 0) {
+      const f = existing[0];
+      if (f.status === 'accepted') { showToast('你们已经是好友了'); return; }
+      if (f.status === 'pending') {
+        if (f.requester_id === currentUser.id) { showToast('已发送过请求，等待对方确认'); return; }
+        else { showToast('对方已向你发送请求，请去好友请求列表接受'); return; }
+      }
+      if (f.status === 'rejected') { showToast('之前被拒绝，无法重复添加'); return; }
+    }
+  } catch(e) { /* 忽略检查错误，继续尝试 */ }
+
   try {
     const { error } = await sbClient.from('friendships').insert({
       id: Date.now(),
@@ -889,6 +907,7 @@ async function sendFriendRequest(targetId) {
       else throw error;
     } else {
       showToast('✅ 好友请求已发送');
+      searchFriend(); // 刷新搜索结果
     }
   } catch(e) { showToast('❌ ' + e.message); }
 }
