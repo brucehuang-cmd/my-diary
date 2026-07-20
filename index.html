@@ -1009,7 +1009,6 @@ async function viewFriendDiaries(friendId, friendName) {
     const { data, error } = await sbClient.from('diaries')
       .select('*')
       .eq('user_id', friendId)
-      .in('visibility', ['friends', 'public'])
       .order('date', { ascending: false });
     if (error) throw error;
 
