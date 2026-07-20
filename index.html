@@ -391,7 +391,7 @@
     <button class="tab-btn active" onclick="switchTab('write', this)">✏️ 写日记</button>
     <button class="tab-btn" onclick="switchTab('list', this)">📚 日记列表</button>
     <button class="tab-btn" onclick="switchTab('calendar', this)">📅 日历</button>
-    <button class="tab-btn" onclick="switchTab('friends', this)">👥 好友</button>
+    <button class="tab-btn" onclick="switchTab('friends', this)" id="tabFriends" style="position:relative">👥 好友 <span id="friendBadge" style="display:none;background:#ef4444;color:#fff;font-size:0.7em;padding:1px 6px;border-radius:10px;margin-left:2px"></span></button>
     <button class="tab-btn" onclick="switchTab('settings', this)">⚙️ 设置</button>
   </div>
 
@@ -892,7 +892,6 @@ async function sendFriendRequest(targetId) {
 async function loadFriends() {
   if (!currentUser) return;
   try {
-    // 我发出的 + 我收到的
     const { data, error } = await sbClient.from('friendships')
       .select('*, profiles!friendships_addressee_id_fkey(nickname,email), req:profiles!friendships_requester_id_fkey(nickname,email)')
       .or(`requester_id.eq.${currentUser.id},addressee_id.eq.${currentUser.id}`);
@@ -902,7 +901,18 @@ async function loadFriends() {
     friendsList = (data||[]).filter(f => f.status === 'accepted');
     renderFriendRequests();
     renderFriendsList();
+    updateFriendBadge();
   } catch(e) { console.error(e); }
+}
+
+function updateFriendBadge() {
+  const badge = document.getElementById('friendBadge');
+  if (pendingRequests.length > 0) {
+    badge.textContent = pendingRequests.length;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 function renderFriendRequests() {
@@ -1547,6 +1557,8 @@ window.addEventListener('offline', () => { isOnline = false; setSyncStatus('offl
 loadDraft();
 // 启动时检查登录状态
 checkAuth();
+// 每15秒检查好友请求
+setInterval(() => { if (currentUser) loadFriends(); }, 15000);
 </script>
 </body>
 </html>
