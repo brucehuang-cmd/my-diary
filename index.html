@@ -259,6 +259,57 @@
   .nickname-box p { color: var(--text-muted); font-size: 0.85em; margin-bottom: 20px; }
   .nickname-box input { margin-bottom: 15px; }
   .nickname-box .btn-primary { width: 100%; box-sizing: border-box; }
+  /* 好友 */
+  .friend-card {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 15px; background: var(--bg-soft); border-radius: 8px;
+    margin-bottom: 8px; transition: all 0.2s;
+  }
+  .friend-card:hover { background: var(--primary-light); }
+  .friend-info { display: flex; align-items: center; gap: 10px; }
+  .friend-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--bg-grad); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1em; font-weight: bold;
+  }
+  .friend-name { font-weight: 600; }
+  .friend-email { font-size: 0.8em; color: var(--text-muted); }
+  .friend-actions { display: flex; gap: 6px; }
+  .friend-actions button {
+    border: none; padding: 5px 12px; border-radius: 5px;
+    cursor: pointer; font-size: 0.85em;
+  }
+  .btn-accept { background: #d4f5d4; color: #2d7a2d; }
+  .btn-reject { background: #fce8e8; color: #d33; }
+  .btn-msg { background: var(--primary-light); color: var(--primary); }
+  .btn-view { background: #e0f2fe; color: #0284c7; }
+  .btn-add { background: var(--primary-light); color: var(--primary); }
+  /* 私信弹窗 */
+  .chat-box {
+    background: var(--bg); border-radius: 16px;
+    width: 420px; max-width: 92vw; height: 500px; max-height: 80vh;
+    display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .chat-header {
+    padding: 15px 20px; background: var(--bg-grad); color: #fff;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .chat-header button { background: rgba(255,255,255,0.2); border: none; color: #fff; cursor: pointer; width: 30px; height: 30px; border-radius: 50%; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px; background: var(--bg-soft); }
+  .chat-bubble { max-width: 75%; padding: 8px 14px; border-radius: 12px; font-size: 0.9em; line-height: 1.5; word-break: break-word; }
+  .chat-bubble.sent { align-self: flex-end; background: var(--primary); color: #fff; border-bottom-right-radius: 4px; }
+  .chat-bubble.received { align-self: flex-start; background: #fff; color: var(--text); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+  .chat-time { font-size: 0.7em; color: var(--text-muted); margin-top: 2px; }
+  .chat-input { padding: 12px; display: flex; gap: 8px; border-top: 1px solid var(--border); }
+  .chat-input input { flex: 1; }
+  .chat-input button { background: var(--primary); color: #fff; border: none; padding: 0 20px; border-radius: 8px; cursor: pointer; }
+  .visibility-badge { font-size: 0.7em; padding: 1px 8px; border-radius: 8px; margin-left: 6px; }
+  .vis-private { background: #fce8e8; color: #d33; }
+  .vis-friends { background: #e0f2fe; color: #0284c7; }
+  .vis-public { background: #d4f5d4; color: #2d7a2d; }
+  .unread-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block; }
 </style>
 </head>
 <body>
@@ -340,6 +391,7 @@
     <button class="tab-btn active" onclick="switchTab('write', this)">✏️ 写日记</button>
     <button class="tab-btn" onclick="switchTab('list', this)">📚 日记列表</button>
     <button class="tab-btn" onclick="switchTab('calendar', this)">📅 日历</button>
+    <button class="tab-btn" onclick="switchTab('friends', this)">👥 好友</button>
     <button class="tab-btn" onclick="switchTab('settings', this)">⚙️ 设置</button>
   </div>
 
@@ -390,6 +442,14 @@
       <textarea id="diary-content" placeholder="写下今天的故事..." oninput="updateWordCount();autoSaveDraft()"></textarea>
       <div class="word-count" id="wordCount">0 字</div>
     </div>
+    <div class="form-group">
+      <label>👁️ 谁能看到这篇日记</label>
+      <select id="diary-visibility">
+        <option value="private">🔒 仅自己可见</option>
+        <option value="friends">👥 好友可见</option>
+        <option value="public">🌍 所有人可见</option>
+      </select>
+    </div>
     <button class="btn-primary" onclick="saveDiary()">💾 保存日记</button>
     <button class="btn-secondary" onclick="clearForm()">清空</button>
   </div>
@@ -438,6 +498,43 @@
   </div>
 
   <!-- 设置 -->
+  <!-- 好友 -->
+  <div id="panel-friends" class="panel">
+    <div class="friend-section">
+      <h3 style="color:var(--primary);margin-bottom:12px">🔍 搜索添加好友</h3>
+      <div style="display:flex;gap:8px;margin-bottom:20px">
+        <input type="text" id="friendSearch" placeholder="输入昵称或邮箱搜索..." style="flex:1" onkeydown="if(event.key==='Enter')searchFriend()">
+        <button class="btn-primary" onclick="searchFriend()" style="padding:10px 20px">搜索</button>
+      </div>
+      <div id="searchResults"></div>
+    </div>
+    <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+    <div class="friend-section">
+      <h3 style="color:var(--primary);margin-bottom:12px">📨 好友请求</h3>
+      <div id="friendRequests"></div>
+    </div>
+    <hr style="margin:20px 0;border:none;border-top:1px solid var(--border)">
+    <div class="friend-section">
+      <h3 style="color:var(--primary);margin-bottom:12px">👥 我的好友</h3>
+      <div id="friendsList"></div>
+    </div>
+  </div>
+
+  <!-- 私信弹窗 -->
+  <div class="nickname-modal" id="chatModal" style="display:none">
+    <div class="chat-box">
+      <div class="chat-header">
+        <span id="chatTitle">私信</span>
+        <button onclick="closeChat()">✕</button>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="输入消息..." onkeydown="if(event.key==='Enter')sendMsg()">
+        <button onclick="sendMsg()">发送</button>
+      </div>
+    </div>
+  </div>
+
   <div id="panel-settings" class="panel">
     <h3 style="margin-bottom:15px;color:var(--primary)">🔒 密码保护</h3>
     <div class="form-group">
@@ -630,11 +727,13 @@ async function checkAuth() {
     // 获取昵称
     userNickname = currentUser.user_metadata?.nickname || localStorage.getItem('nickname_' + currentUser.id) || '';
     updateDisplayName();
+    await ensureProfile();
     // 没有昵称就弹窗
     if (!userNickname) {
       showNicknameModal();
     }
     await syncFromCloud();
+    loadFriends();
   } else {
     showAuthScreen();
   }
@@ -667,9 +766,9 @@ async function saveNickname() {
   if (!name) { showToast('请输入昵称'); return; }
   userNickname = name;
   localStorage.setItem('nickname_' + currentUser.id, name);
-  // 保存到 Supabase 用户信息
   try {
     await sbClient.auth.updateUser({ data: { nickname: name } });
+    await ensureProfile();
   } catch(e) {}
   updateDisplayName();
   hideNicknameModal();
@@ -716,6 +815,253 @@ sbClient.auth.onAuthStateChange((event, session) => {
     }
   }
 });
+
+// ===== 好友系统 =====
+let friendsList = [];
+let pendingRequests = [];
+let chatPartnerId = null;
+let chatPollTimer = null;
+
+// 保存自己的 profile
+async function ensureProfile() {
+  if (!currentUser) return;
+  const nickname = currentUser.user_metadata?.nickname || localStorage.getItem('nickname_' + currentUser.id) || '用户';
+  try {
+    await sbClient.from('profiles').upsert({
+      user_id: currentUser.id,
+      email: currentUser.email,
+      nickname: nickname,
+      created: new Date().toISOString()
+    });
+  } catch(e) {}
+}
+
+// 搜索好友
+async function searchFriend() {
+  const q = document.getElementById('friendSearch').value.trim();
+  const box = document.getElementById('searchResults');
+  if (!q) { box.innerHTML = ''; return; }
+  try {
+    const { data, error } = await sbClient.from('profiles')
+      .select('*')
+      .or(`nickname.ilike.%${q}%,email.ilike.%${q}%`)
+      .neq('user_id', currentUser.id);
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      box.innerHTML = '<div class="empty">未找到用户</div>';
+      return;
+    }
+    box.innerHTML = data.map(p => `
+      <div class="friend-card">
+        <div class="friend-info">
+          <div class="friend-avatar">${(p.nickname||'?')[0]}</div>
+          <div>
+            <div class="friend-name">${escapeHtml(p.nickname || '未命名')}</div>
+            <div class="friend-email">${escapeHtml(p.email)}</div>
+          </div>
+        </div>
+        <div class="friend-actions">
+          <button class="btn-add" onclick="sendFriendRequest('${p.user_id}')">➕ 加好友</button>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { box.innerHTML = '<div class="empty">搜索失败</div>'; }
+}
+
+// 发送好友请求
+async function sendFriendRequest(targetId) {
+  try {
+    const { error } = await sbClient.from('friendships').insert({
+      id: Date.now(),
+      requester_id: currentUser.id,
+      addressee_id: targetId,
+      status: 'pending',
+      relation_type: 'friend',
+      created: new Date().toISOString()
+    });
+    if (error) {
+      if (error.message.includes('duplicate')) showToast('已发送过请求');
+      else throw error;
+    } else {
+      showToast('✅ 好友请求已发送');
+    }
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// 加载好友和请求
+async function loadFriends() {
+  if (!currentUser) return;
+  try {
+    // 我发出的 + 我收到的
+    const { data, error } = await sbClient.from('friendships')
+      .select('*, profiles!friendships_addressee_id_fkey(nickname,email), req:profiles!friendships_requester_id_fkey(nickname,email)')
+      .or(`requester_id.eq.${currentUser.id},addressee_id.eq.${currentUser.id}`);
+    if (error) throw error;
+
+    pendingRequests = (data||[]).filter(f => f.addressee_id === currentUser.id && f.status === 'pending');
+    friendsList = (data||[]).filter(f => f.status === 'accepted');
+    renderFriendRequests();
+    renderFriendsList();
+  } catch(e) { console.error(e); }
+}
+
+function renderFriendRequests() {
+  const box = document.getElementById('friendRequests');
+  if (pendingRequests.length === 0) {
+    box.innerHTML = '<div class="empty" style="padding:20px">暂无好友请求</div>';
+    return;
+  }
+  box.innerHTML = pendingRequests.map(f => {
+    const p = f.req;
+    return `
+      <div class="friend-card">
+        <div class="friend-info">
+          <div class="friend-avatar">${(p?.nickname||'?')[0]}</div>
+          <div>
+            <div class="friend-name">${escapeHtml(p?.nickname || '未命名')}</div>
+            <div class="friend-email">${escapeHtml(p?.email)}</div>
+          </div>
+        </div>
+        <div class="friend-actions">
+          <button class="btn-accept" onclick="respondFriend(${f.id}, 'accepted')">✅ 接受</button>
+          <button class="btn-reject" onclick="respondFriend(${f.id}, 'rejected')">❌ 拒绝</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderFriendsList() {
+  const box = document.getElementById('friendsList');
+  if (friendsList.length === 0) {
+    box.innerHTML = '<div class="empty" style="padding:20px">还没有好友，去搜索添加吧~</div>';
+    return;
+  }
+  box.innerHTML = friendsList.map(f => {
+    const isRequester = f.requester_id === currentUser.id;
+    const p = isRequester ? f.profiles : f.req;
+    const otherId = isRequester ? f.addressee_id : f.requester_id;
+    return `
+      <div class="friend-card">
+        <div class="friend-info">
+          <div class="friend-avatar">${(p?.nickname||'?')[0]}</div>
+          <div>
+            <div class="friend-name">${escapeHtml(p?.nickname || '未命名')}</div>
+            <div class="friend-email">${escapeHtml(p?.email)}</div>
+          </div>
+        </div>
+        <div class="friend-actions">
+          <button class="btn-view" onclick="viewFriendDiaries('${otherId}','${escapeHtml(p?.nickname||'')}')">📖 看日记</button>
+          <button class="btn-msg" onclick="openChat('${otherId}','${escapeHtml(p?.nickname||'')}')">💬 私信</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function respondFriend(id, status) {
+  try {
+    const { error } = await sbClient.from('friendships').update({ status }).eq('id', id);
+    if (error) throw error;
+    showToast(status === 'accepted' ? '✅ 已添加好友' : '已拒绝');
+    loadFriends();
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// 看好友的日记
+async function viewFriendDiaries(friendId, friendName) {
+  try {
+    const { data, error } = await sbClient.from('diaries')
+      .select('*')
+      .eq('user_id', friendId)
+      .in('visibility', ['friends', 'public'])
+      .order('date', { ascending: false });
+    if (error) throw error;
+
+    switchTab('list', document.querySelectorAll('.tab-btn')[1]);
+    const list = document.getElementById('diary-list');
+    if (!data || data.length === 0) {
+      list.innerHTML = `<div class="empty">📭 ${friendName} 还没有公开的日记</div>`;
+      return;
+    }
+    document.getElementById('search').value = '';
+    list.innerHTML = `<div style="text-align:center;color:var(--primary);margin-bottom:15px">📖 ${friendName} 的日记</div>` + data.map(d => `
+      <div class="diary-item">
+        <div class="meta">
+          <span class="date">📅 ${d.date || ''} ${d.mood||''} ${d.weather||''}</span>
+        </div>
+        ${d.title ? `<h3>${escapeHtml(d.title)}</h3>` : ''}
+        <div class="content">${escapeHtml(d.content)}</div>
+        ${d.tags && d.tags.length ? `<div class="tags">${d.tags.map(t=>`<span>#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+      </div>
+    `).join('');
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ===== 私信 =====
+async function openChat(friendId, friendName) {
+  chatPartnerId = friendId;
+  document.getElementById('chatTitle').textContent = '💬 ' + friendName;
+  document.getElementById('chatModal').style.display = 'flex';
+  document.getElementById('chatInput').focus();
+  await loadMessages();
+  // 轮询新消息
+  chatPollTimer = setInterval(loadMessages, 3000);
+}
+
+function closeChat() {
+  document.getElementById('chatModal').style.display = 'none';
+  chatPartnerId = null;
+  if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+}
+
+async function loadMessages() {
+  if (!chatPartnerId) return;
+  try {
+    const { data, error } = await sbClient.from('messages')
+      .select('*')
+      .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${chatPartnerId}),and(sender_id.eq.${chatPartnerId},receiver_id.eq.${currentUser.id})`)
+      .order('created', { ascending: true });
+    if (error) throw error;
+    renderMessages(data || []);
+    // 标记已读
+    await sbClient.from('messages').update({ is_read: true })
+      .eq('sender_id', chatPartnerId).eq('receiver_id', currentUser.id);
+  } catch(e) {}
+}
+
+function renderMessages(msgs) {
+  const box = document.getElementById('chatMessages');
+  box.innerHTML = msgs.map(m => {
+    const sent = m.sender_id === currentUser.id;
+    return `
+      <div class="chat-bubble ${sent ? 'sent' : 'received'}">
+        ${escapeHtml(m.content)}
+        <div class="chat-time">${m.created ? new Date(m.created).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : ''}</div>
+      </div>
+    `;
+  }).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendMsg() {
+  const inp = document.getElementById('chatInput');
+  const content = inp.value.trim();
+  if (!content || !chatPartnerId) return;
+  inp.value = '';
+  try {
+    const { error } = await sbClient.from('messages').insert({
+      id: Date.now(),
+      sender_id: currentUser.id,
+      receiver_id: chatPartnerId,
+      content: content,
+      created: new Date().toISOString(),
+      is_read: false
+    });
+    if (error) throw error;
+    await loadMessages();
+  } catch(e) { showToast('❌ 发送失败'); }
+}
 
 // ===== 同步状态指示 =====
 function setSyncStatus(state, text) {
@@ -860,6 +1206,7 @@ function switchTab(tab, btn) {
   if (tab === 'list') renderList();
   if (tab === 'calendar') renderCalendar();
   if (tab === 'settings') { renderSettingsStats(); renderCloudInfo(); }
+  if (tab === 'friends') { loadFriends(); }
 }
 
 // ===== 云端同步 =====
@@ -937,16 +1284,17 @@ async function saveDiary() {
   const date = document.getElementById('diary-date').value;
   const title = document.getElementById('diary-title').value.trim();
   const content = document.getElementById('diary-content').value.trim();
+  const visibility = document.getElementById('diary-visibility').value;
   if (!title && !content) { alert('请写点什么吧~'); return; }
 
   setSyncStatus('syncing', '保存中...');
   if (editingId !== null) {
-    const updated = { ...diaries[editingId], date, title, content, mood: selectedMood, weather: selectedWeather, tags: currentTags, updated: new Date().toISOString(), user_id: currentUser.id };
+    const updated = { ...diaries[editingId], date, title, content, mood: selectedMood, weather: selectedWeather, tags: currentTags, visibility, updated: new Date().toISOString(), user_id: currentUser.id };
     diaries[editingId] = updated;
     await saveToCloud(updated);
     editingId = null;
   } else {
-    const newDiary = { id: Date.now(), date, title, content, mood: selectedMood, weather: selectedWeather, tags: currentTags, pinned: false, created: new Date().toISOString(), user_id: currentUser.id };
+    const newDiary = { id: Date.now(), date, title, content, mood: selectedMood, weather: selectedWeather, tags: currentTags, visibility, pinned: false, created: new Date().toISOString(), user_id: currentUser.id };
     diaries.push(newDiary);
     await saveToCloud(newDiary);
   }
@@ -979,6 +1327,7 @@ function editDiary(id) {
   document.querySelectorAll('.weather-row .emoji-btn').forEach(b => b.classList.toggle('selected', b.dataset.weather === d.weather));
   selectedMood = d.mood || ''; selectedWeather = d.weather || '';
   currentTags = [...(d.tags || [])]; renderTags(); updateWordCount();
+  document.getElementById('diary-visibility').value = d.visibility || 'private';
   editingId = diaries.indexOf(d);
   switchTab('write', document.querySelectorAll('.tab-btn')[0]);
 }
@@ -1048,10 +1397,13 @@ function renderList() {
     list.innerHTML = '<div class="empty">📭 没有匹配的日记</div>';
     return;
   }
-  list.innerHTML = filtered.map(d => `
+  list.innerHTML = filtered.map(d => {
+    const vis = d.visibility || 'private';
+    const visLabel = vis === 'public' ? '<span class="visibility-badge vis-public">🌍 公开</span>' : vis === 'friends' ? '<span class="visibility-badge vis-friends">👥 好友可见</span>' : '<span class="visibility-badge vis-private">🔒 私密</span>';
+    return `
     <div class="diary-item ${d.pinned?'pinned':''}">
       <div class="meta">
-        <span class="date">📅 ${d.date || '未设置'} ${d.pinned?'📌':''}</span>
+        <span class="date">📅 ${d.date || '未设置'} ${d.pinned?'📌':''} ${visLabel}</span>
         <span class="mood-weather">${d.mood || ''} ${d.weather || ''}</span>
       </div>
       ${d.title ? `<h3>${escapeHtml(d.title)}</h3>` : ''}
@@ -1064,7 +1416,7 @@ function renderList() {
         <button class="btn-copy" onclick="copyDiary(${d.id})">📋 复制</button>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 // ===== 日历 =====
