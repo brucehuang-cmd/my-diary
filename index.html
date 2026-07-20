@@ -841,17 +841,22 @@ async function searchFriend() {
   const q = document.getElementById('friendSearch').value.trim();
   const box = document.getElementById('searchResults');
   if (!q) { box.innerHTML = ''; return; }
+  if (!currentUser) { box.innerHTML = '<div class="empty">请先登录</div>'; return; }
   try {
+    // 先拉取所有用户，本地过滤（避免 or 语法问题）
     const { data, error } = await sbClient.from('profiles')
       .select('*')
-      .or(`nickname.ilike.%${q}%,email.ilike.%${q}%`)
       .neq('user_id', currentUser.id);
     if (error) throw error;
-    if (!data || data.length === 0) {
+    const filtered = (data || []).filter(p =>
+      (p.nickname || '').toLowerCase().includes(q.toLowerCase()) ||
+      (p.email || '').toLowerCase().includes(q.toLowerCase())
+    );
+    if (filtered.length === 0) {
       box.innerHTML = '<div class="empty">未找到用户</div>';
       return;
     }
-    box.innerHTML = data.map(p => `
+    box.innerHTML = filtered.map(p => `
       <div class="friend-card">
         <div class="friend-info">
           <div class="friend-avatar">${(p.nickname||'?')[0]}</div>
@@ -865,7 +870,7 @@ async function searchFriend() {
         </div>
       </div>
     `).join('');
-  } catch(e) { box.innerHTML = '<div class="empty">搜索失败</div>'; }
+  } catch(e) { box.innerHTML = '<div class="empty">搜索失败: ' + e.message + '</div>'; }
 }
 
 // 发送好友请求
@@ -892,13 +897,14 @@ async function sendFriendRequest(targetId) {
 async function loadFriends() {
   if (!currentUser) return;
   try {
-    const { data, error } = await sbClient.from('friendships')
-      .select('*, profiles!friendships_addressee_id_fkey(nickname,email), req:profiles!friendships_requester_id_fkey(nickname,email)')
-      .or(`requester_id.eq.${currentUser.id},addressee_id.eq.${currentUser.id}`);
-    if (error) throw error;
-
-    pendingRequests = (data||[]).filter(f => f.addressee_id === currentUser.id && f.status === 'pending');
-    friendsList = (data||[]).filter(f => f.status === 'accepted');
+    // 分两次查询：我发出的 + 我收到的
+    const [sent, received] = await Promise.all([
+      sbClient.from('friendships').select('*, profiles!friendships_addressee_id_fkey(nickname,email), req:profiles!friendships_requester_id_fkey(nickname,email)').eq('requester_id', currentUser.id),
+      sbClient.from('friendships').select('*, profiles!friendships_addressee_id_fkey(nickname,email), req:profiles!friendships_requester_id_fkey(nickname,email)').eq('addressee_id', currentUser.id)
+    ]);
+    const data = [...(sent.data||[]), ...(received.data||[])];
+    pendingRequests = data.filter(f => f.addressee_id === currentUser.id && f.status === 'pending');
+    friendsList = data.filter(f => f.status === 'accepted');
     renderFriendRequests();
     renderFriendsList();
     updateFriendBadge();
