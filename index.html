@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的日记本</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg-grad: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --primary: #764ba2;
+    --primary-light: #f3eefa;
+    --bg: #fff;
+    --bg-soft: #fafafa;
+    --text: #333;
+    --text-soft: #555;
+    --text-muted: #888;
+    --border: #e0e0e0;
+    --panel-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  }
+  [data-theme="dark"] {
+    --bg-grad: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    --primary: #a78bfa;
+    --primary-light: #2d2456;
+    --bg: #1e1e2e;
+    --bg-soft: #252535;
+    --text: #e0e0e0;
+    --text-soft: #c0c0c0;
+    --text-muted: #888;
+    --border: #3a3a4a;
+    --panel-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  }
+  body {
+    font-family: -apple-system, "Microsoft YaHei", sans-serif;
+    background: var(--bg-grad);
+    min-height: 100vh;
+    color: var(--text);
+    transition: background 0.5s;
+  }
+  .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+  header {
+    text-align: center;
+    color: #fff;
+    padding: 30px 0;
+    position: relative;
+  }
+  header h1 { font-size: 2.2em; margin-bottom: 5px; }
+  header p { opacity: 0.85; font-size: 0.95em; }
+  .sync-status {
+    position: absolute;
+    top: 30px;
+    left: 10px;
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
+  .sync-dot.offline { background: #f87171; }
+  .sync-dot.syncing { background: #fbbf24; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .theme-toggle {
+    position: absolute;
+    top: 30px;
+    right: 10px;
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: #fff;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.3em;
+    transition: all 0.3s;
+  }
+  .theme-toggle:hover { background: rgba(255,255,255,0.35); transform: rotate(20deg); }
+  .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+  .tab-btn {
+    flex: 1; padding: 12px; border: none;
+    background: rgba(255,255,255,0.2); color: #fff;
+    border-radius: 8px; cursor: pointer; font-size: 1em;
+    transition: all 0.3s;
+  }
+  .tab-btn.active { background: #fff; color: var(--primary); font-weight: bold; }
+  [data-theme="dark"] .tab-btn.active { background: var(--bg); color: var(--primary); }
+  .panel {
+    background: var(--bg);
+    border-radius: 12px; padding: 25px;
+    box-shadow: var(--panel-shadow);
+    display: none;
+  }
+  .panel.active { display: block; }
+  .form-group { margin-bottom: 18px; }
+  label { display: block; margin-bottom: 6px; font-weight: 600; color: var(--text-soft); }
+  input[type="text"], input[type="date"], input[type="password"], textarea, select {
+    width: 100%; padding: 10px 12px;
+    border: 2px solid var(--border); border-radius: 8px;
+    font-size: 1em; font-family: inherit;
+    background: var(--bg); color: var(--text);
+    transition: border 0.3s;
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--primary); }
+  textarea { resize: vertical; min-height: 150px; }
+  .mood-row, .weather-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .emoji-btn {
+    font-size: 1.6em; padding: 6px 12px;
+    border: 2px solid var(--border); border-radius: 8px;
+    cursor: pointer; background: var(--bg);
+    transition: all 0.2s;
+  }
+  .emoji-btn.selected { border-color: var(--primary); background: var(--primary-light); transform: scale(1.1); }
+  .tags-input-wrapper { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border: 2px solid var(--border); border-radius: 8px; min-height: 44px; }
+  .tag-chip {
+    background: var(--primary-light); color: var(--primary);
+    padding: 3px 10px; border-radius: 12px; font-size: 0.85em;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .tag-chip span { cursor: pointer; font-weight: bold; }
+  .tags-input-wrapper input { border: none; outline: none; flex: 1; min-width: 100px; padding: 4px; background: transparent; color: var(--text); }
+  .btn-primary {
+    background: var(--bg-grad); color: #fff; border: none;
+    padding: 12px 30px; border-radius: 8px; font-size: 1.05em; cursor: pointer;
+  }
+  .btn-secondary {
+    background: var(--border); color: var(--text-soft); border: none;
+    padding: 12px 25px; border-radius: 8px; cursor: pointer; font-size: 1em; margin-left: 10px;
+  }
+  .word-count { text-align: right; color: var(--text-muted); font-size: 0.85em; margin-top: 4px; }
+  .diary-list { display: flex; flex-direction: column; gap: 15px; }
+  .diary-item {
+    border-left: 4px solid var(--primary);
+    background: var(--bg-soft); padding: 15px 18px;
+    border-radius: 0 8px 8px 0; transition: all 0.2s;
+    position: relative;
+  }
+  .diary-item.pinned { border-left-color: #f59e0b; background: linear-gradient(90deg, rgba(245,158,11,0.08), var(--bg-soft) 30%); }
+  .diary-item:hover { transform: translateX(3px); }
+  .diary-item .meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+  .diary-item .date { color: var(--text-muted); font-size: 0.85em; }
+  .diary-item .mood-weather { font-size: 1.3em; display: flex; gap: 6px; align-items: center; }
+  .diary-item h3 { color: var(--text); margin-bottom: 6px; }
+  .diary-item .content { color: var(--text-soft); line-height: 1.7; white-space: pre-wrap; }
+  .diary-item .tags { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .diary-item .tags span { background: var(--primary-light); color: var(--primary); padding: 2px 10px; border-radius: 10px; font-size: 0.78em; }
+  .diary-item .actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .diary-item .actions button { border: none; padding: 5px 14px; border-radius: 5px; cursor: pointer; font-size: 0.85em; }
+  .btn-edit { background: var(--primary-light); color: var(--primary); }
+  .btn-del { background: #fce8e8; color: #d33; }
+  .btn-pin { background: #fef3c7; color: #d97706; }
+  .btn-copy { background: #e0f2fe; color: #0284c7; }
+  .empty { text-align: center; padding: 40px; color: var(--text-muted); }
+  .stats { display: flex; gap: 15px; margin-bottom: 20px; }
+  .stat-card {
+    flex: 1; background: var(--bg-grad); color: #fff;
+    padding: 15px; border-radius: 10px; text-align: center;
+  }
+  .stat-card .num { font-size: 1.8em; font-weight: bold; }
+  .stat-card .label { font-size: 0.85em; opacity: 0.9; }
+  .search-box {
+    width: 100%; padding: 10px 14px;
+    border: 2px solid var(--border); border-radius: 20px;
+    margin-bottom: 12px; font-size: 0.95em;
+    background: var(--bg); color: var(--text);
+  }
+  .search-box:focus { outline: none; border-color: var(--primary); }
+  .filter-row { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .filter-row select { flex: 1; min-width: 120px; padding: 8px; border-radius: 8px; border: 2px solid var(--border); background: var(--bg); color: var(--text); }
+  .calendar { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  .calendar th { padding: 8px; color: var(--text-muted); font-size: 0.85em; }
+  .calendar td { padding: 0; text-align: center; }
+  .cal-day {
+    width: 100%; aspect-ratio: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; cursor: pointer;
+    border-radius: 8px; transition: all 0.2s; position: relative; font-size: 0.9em;
+  }
+  .cal-day:hover { background: var(--primary-light); }
+  .cal-day.has-diary { background: var(--primary); color: #fff; font-weight: bold; }
+  .cal-day.has-diary:hover { background: var(--primary); opacity: 0.85; }
+  .cal-day.today { border: 2px solid #f59e0b; }
+  .cal-day.other-month { opacity: 0.3; }
+  .cal-day .dot { width: 5px; height: 5px; border-radius: 50%; background: #f59e0b; margin-top: 2px; }
+  .cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .cal-nav button { background: var(--primary-light); color: var(--primary); border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; }
+  .cal-nav span { font-weight: bold; color: var(--text); }
+  .lock-screen {
+    position: fixed; inset: 0; background: var(--bg-grad);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 999; color: #fff;
+  }
+  .lock-screen input { width: 200px; text-align: center; font-size: 1.5em; letter-spacing: 0.5em; }
+  .lock-screen .btn-primary { margin-top: 15px; }
+  .lock-screen h2 { margin-bottom: 20px; }
+  .lock-screen .hint { margin-top: 10px; opacity: 0.7; font-size: 0.85em; }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .toolbar button { background: var(--bg-soft); border: 1px solid var(--border); color: var(--text-soft); padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.9em; }
+  .toolbar button:hover { border-color: var(--primary); color: var(--primary); }
+  .draft-badge { display: inline-block; background: #fef3c7; color: #d97706; padding: 2px 8px; border-radius: 10px; font-size: 0.75em; margin-left: 8px; }
+  .toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    background: #333; color: #fff; padding: 12px 24px;
+    border-radius: 8px; z-index: 1000; opacity: 0;
+    transition: opacity 0.3s; font-size: 0.9em;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- 锁屏 -->
+<div class="lock-screen" id="lockScreen" style="display:none">
+  <h2>🔒 日记本已上锁</h2>
+  <input type="password" id="pinInput" placeholder="PIN" maxlength="6" onkeydown="if(event.key==='Enter')unlock()">
+  <button class="btn-primary" onclick="unlock()">🔓 解锁</button>
+  <div class="hint" id="lockHint"></div>
+</div>
+
+<!-- 提示 -->
+<div class="toast" id="toast"></div>
+
+<div class="container">
+  <header>
+    <div class="sync-status" id="syncStatus">
+      <div class="sync-dot syncing" id="syncDot"></div>
+      <span id="syncText">同步中...</span>
+    </div>
+    <h1>📖 我的日记本</h1>
+    <p>记录每一天的心情与故事 · 云端同步</p>
+    <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('write', this)">✏️ 写日记</button>
+    <button class="tab-btn" onclick="switchTab('list', this)">📚 日记列表</button>
+    <button class="tab-btn" onclick="switchTab('calendar', this)">📅 日历</button>
+    <button class="tab-btn" onclick="switchTab('settings', this)">⚙️ 设置</button>
+  </div>
+
+  <!-- 写日记 -->
+  <div id="panel-write" class="panel active">
+    <div class="form-group">
+      <label>📅 日期</label>
+      <input type="date" id="diary-date">
+    </div>
+    <div class="form-group">
+      <label>📝 标题</label>
+      <input type="text" id="diary-title" placeholder="给今天起个标题...">
+    </div>
+    <div class="form-group">
+      <label>😊 心情</label>
+      <div class="mood-row" id="mood-row">
+        <button class="emoji-btn" data-mood="😊">😊</button>
+        <button class="emoji-btn" data-mood="😢">😢</button>
+        <button class="emoji-btn" data-mood="😡">😡</button>
+        <button class="emoji-btn" data-mood="😍">😍</button>
+        <button class="emoji-btn" data-mood="😴">😴</button>
+        <button class="emoji-btn" data-mood="🤔">🤔</button>
+        <button class="emoji-btn" data-mood="🎉">🎉</button>
+        <button class="emoji-btn" data-mood="😌">😌</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>🌤️ 天气</label>
+      <div class="weather-row" id="weather-row">
+        <button class="emoji-btn" data-weather="☀️">☀️</button>
+        <button class="emoji-btn" data-weather="⛅">⛅</button>
+        <button class="emoji-btn" data-weather="☁️">☁️</button>
+        <button class="emoji-btn" data-weather="🌧️">🌧️</button>
+        <button class="emoji-btn" data-weather="⛈️">⛈️</button>
+        <button class="emoji-btn" data-weather="❄️">❄️</button>
+        <button class="emoji-btn" data-weather="🌫️">🌫️</button>
+        <button class="emoji-btn" data-weather="🌪️">🌪️</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>🏷️ 标签 <span class="draft-badge" id="draftBadge" style="display:none">草稿已自动保存</span></label>
+      <div class="tags-input-wrapper" id="tagsWrapper">
+        <input type="text" id="tagInput" placeholder="输入标签按回车添加..." onkeydown="if(event.key==='Enter'){event.preventDefault();addTag()}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>✍️ 内容</label>
+      <textarea id="diary-content" placeholder="写下今天的故事..." oninput="updateWordCount();autoSaveDraft()"></textarea>
+      <div class="word-count" id="wordCount">0 字</div>
+    </div>
+    <button class="btn-primary" onclick="saveDiary()">💾 保存日记</button>
+    <button class="btn-secondary" onclick="clearForm()">清空</button>
+  </div>
+
+  <!-- 日记列表 -->
+  <div id="panel-list" class="panel">
+    <div class="stats" id="stats"></div>
+    <input type="text" class="search-box" id="search" placeholder="🔍 搜索标题或内容..." oninput="renderList()">
+    <div class="filter-row">
+      <select id="filterMood" onchange="renderList()">
+        <option value="">所有心情</option>
+        <option value="😊">😊 开心</option>
+        <option value="😢">😢 难过</option>
+        <option value="😡">😡 生气</option>
+        <option value="😍">😍 喜爱</option>
+        <option value="😴">😴 疲惫</option>
+        <option value="🤔">🤔 思考</option>
+        <option value="🎉">🎉 庆祝</option>
+        <option value="😌">😌 平静</option>
+      </select>
+      <select id="filterTag" onchange="renderList()"></select>
+      <select id="filterSort" onchange="renderList()">
+        <option value="date-desc">日期 ↓</option>
+        <option value="date-asc">日期 ↑</option>
+        <option value="len-desc">字数 ↓</option>
+      </select>
+    </div>
+    <div class="diary-list" id="diary-list"></div>
+  </div>
+
+  <!-- 日历视图 -->
+  <div id="panel-calendar" class="panel">
+    <div class="cal-nav">
+      <button onclick="changeMonth(-1)">◀ 上月</button>
+      <span id="calTitle"></span>
+      <button onclick="changeMonth(1)">下月 ▶</button>
+    </div>
+    <table class="calendar">
+      <thead><tr><th>日</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>六</th></tr></thead>
+      <tbody id="calBody"></tbody>
+    </table>
+    <div style="text-align:center;color:var(--text-muted);font-size:0.85em">
+      💡 紫色日期 = 有日记，点击日期可查看当天日记
+    </div>
+    <div id="calDayDiaries" style="margin-top:20px"></div>
+  </div>
+
+  <!-- 设置 -->
+  <div id="panel-settings" class="panel">
+    <h3 style="margin-bottom:15px;color:var(--primary)">🔒 密码保护</h3>
+    <div class="form-group">
+      <label>设置 PIN（留空 = 关闭密码锁）</label>
+      <input type="password" id="setPin" placeholder="4-6位数字" maxlength="6">
+    </div>
+    <button class="btn-primary" onclick="setPin()">保存 PIN</button>
+    <button class="btn-secondary" onclick="document.getElementById('setPin').value='';setPin()">取消密码锁</button>
+
+    <hr style="margin:25px 0;border:none;border-top:1px solid var(--border)">
+
+    <h3 style="margin-bottom:15px;color:var(--primary)">☁️ 云端数据</h3>
+    <div id="cloudInfo" style="color:var(--text-soft);line-height:2;margin-bottom:15px"></div>
+    <div class="toolbar">
+      <button onclick="syncFromCloud()">☁️ 从云端拉取</button>
+      <button onclick="syncToCloud()">⬆️ 本地数据上传到云端</button>
+      <button onclick="forceSync()">🔄 强制同步</button>
+    </div>
+
+    <hr style="margin:25px 0;border:none;border-top:1px solid var(--border)">
+
+    <h3 style="margin-bottom:15px;color:var(--primary)">💾 本地数据管理</h3>
+    <div class="toolbar">
+      <button onclick="exportData()">📥 导出全部日记 (JSON)</button>
+      <button onclick="document.getElementById('importFile').click()">📤 导入日记</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+      <button onclick="exportTxt()">📄 导出为文本</button>
+      <button onclick="clearAllData()" style="color:#d33">🗑️ 清空全部</button>
+    </div>
+
+    <hr style="margin:25px 0;border:none;border-top:1px solid var(--border)">
+
+    <h3 style="margin-bottom:15px;color:var(--primary)">📊 数据统计</h3>
+    <div id="settingsStats" style="color:var(--text-soft);line-height:2"></div>
+  </div>
+</div>
+
+<!-- Supabase JS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ===== Supabase 配置 =====
+const SUPABASE_URL = 'https://dubochnyhmfpiedwtfdk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_h5IvidC9ugMcMD5ipm_LuQ_DWtR6Ozp';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const TABLE = 'diaries';
+
+// ===== 状态 =====
+let diaries = JSON.parse(localStorage.getItem('diaries') || '[]');
+let editingId = null;
+let selectedMood = '';
+let selectedWeather = '';
+let currentTags = [];
+let calDate = new Date();
+let isOnline = navigator.onLine;
+
+// ===== 同步状态指示 =====
+function setSyncStatus(state, text) {
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  dot.className = 'sync-dot ' + state;
+  txt.textContent = text;
+}
+
+// ===== Toast 提示 =====
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ===== 主题 =====
+function loadTheme() {
+  const t = localStorage.getItem('diary-theme') || 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('themeBtn').textContent = t === 'dark' ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('diary-theme', next);
+  document.getElementById('themeBtn').textContent = next === 'dark' ? '☀️' : '🌙';
+}
+loadTheme();
+
+// ===== PIN 锁 =====
+function checkLock() {
+  const pin = localStorage.getItem('diary-pin');
+  if (pin) {
+    document.getElementById('lockScreen').style.display = 'flex';
+    document.getElementById('lockHint').textContent = '';
+  } else {
+    document.getElementById('lockScreen').style.display = 'none';
+  }
+}
+function unlock() {
+  const pin = localStorage.getItem('diary-pin');
+  const input = document.getElementById('pinInput').value;
+  if (input === pin) {
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('pinInput').value = '';
+  } else {
+    document.getElementById('lockHint').textContent = '❌ PIN 错误';
+    document.getElementById('pinInput').value = '';
+  }
+}
+function setPin() {
+  const pin = document.getElementById('setPin').value.trim();
+  if (pin && !/^\d{4,6}$/.test(pin)) { alert('PIN 需为 4-6 位数字'); return; }
+  if (pin) { localStorage.setItem('diary-pin', pin); showToast('✅ PIN 已设置'); }
+  else { localStorage.removeItem('diary-pin'); showToast('✅ 密码锁已关闭'); }
+}
+checkLock();
+
+// ===== 默认今天 =====
+document.getElementById('diary-date').valueAsDate = new Date();
+
+// ===== 表情选择 =====
+function bindEmoji(selector, key) {
+  document.querySelectorAll(selector).forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(selector).forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      if (key === 'mood') selectedMood = btn.dataset.mood;
+      else selectedWeather = btn.dataset.weather;
+    };
+  });
+}
+bindEmoji('.mood-row .emoji-btn', 'mood');
+bindEmoji('.weather-row .emoji-btn', 'weather');
+
+// ===== 标签 =====
+function addTag() {
+  const inp = document.getElementById('tagInput');
+  const val = inp.value.trim();
+  if (val && !currentTags.includes(val)) {
+    currentTags.push(val);
+    renderTags();
+  }
+  inp.value = '';
+}
+function renderTags() {
+  const wrapper = document.getElementById('tagsWrapper');
+  const input = document.getElementById('tagInput');
+  wrapper.querySelectorAll('.tag-chip').forEach(c => c.remove());
+  currentTags.forEach((t, i) => {
+    const chip = document.createElement('span');
+    chip.className = 'tag-chip';
+    chip.innerHTML = `${t} <span onclick="removeTag(${i})">×</span>`;
+    wrapper.insertBefore(chip, input);
+  });
+}
+function removeTag(i) { currentTags.splice(i, 1); renderTags(); }
+
+// ===== 字数 + 草稿 =====
+function updateWordCount() {
+  document.getElementById('wordCount').textContent = document.getElementById('diary-content').value.length + ' 字';
+}
+let draftTimer;
+function autoSaveDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    const draft = {
+      date: document.getElementById('diary-date').value,
+      title: document.getElementById('diary-title').value,
+      content: document.getElementById('diary-content').value,
+      mood: selectedMood, weather: selectedWeather, tags: currentTags
+    };
+    localStorage.setItem('diary-draft', JSON.stringify(draft));
+    document.getElementById('draftBadge').style.display = 'inline-block';
+  }, 800);
+}
+function loadDraft() {
+  const d = JSON.parse(localStorage.getItem('diary-draft') || 'null');
+  if (d && confirm('发现未保存的草稿，要恢复吗？')) {
+    document.getElementById('diary-date').value = d.date;
+    document.getElementById('diary-title').value = d.title || '';
+    document.getElementById('diary-content').value = d.content || '';
+    selectedMood = d.mood || ''; selectedWeather = d.weather || '';
+    currentTags = d.tags || [];
+    document.querySelectorAll('.mood-row .emoji-btn').forEach(b => b.classList.toggle('selected', b.dataset.mood === selectedMood));
+    document.querySelectorAll('.weather-row .emoji-btn').forEach(b => b.classList.toggle('selected', b.dataset.weather === selectedWeather));
+    renderTags(); updateWordCount();
+  } else {
+    localStorage.removeItem('diary-draft');
+  }
+}
+
+// ===== Tab 切换 =====
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('panel-' + tab).classList.add('active');
+  if (tab === 'list') renderList();
+  if (tab === 'calendar') renderCalendar();
+  if (tab === 'settings') { renderSettingsStats(); renderCloudInfo(); }
+}
+
+// ===== 云端同步 =====
+async function syncFromCloud() {
+  setSyncStatus('syncing', '从云端拉取...');
+  try {
+    const { data, error } = await sbClient.from(TABLE).select('*').order('date', { ascending: false });
+    if (error) throw error;
+    if (data) {
+      diaries = data.map(d => ({
+        id: d.id, date: d.date, title: d.title, content: d.content,
+        mood: d.mood, weather: d.weather, tags: d.tags || [],
+        pinned: d.pinned || false, created: d.created, updated: d.updated
+      }));
+      localStorage.setItem('diaries', JSON.stringify(diaries));
+    }
+    setSyncStatus('', '已同步 · ' + new Date().toLocaleTimeString());
+    showToast('☁️ 已从云端拉取 ' + diaries.length + ' 篇日记');
+  } catch (e) {
+    setSyncStatus('offline', '同步失败');
+    showToast('❌ 同步失败: ' + e.message);
+  }
+}
+
+async function syncToCloud() {
+  if (diaries.length === 0) { showToast('没有本地数据'); return; }
+  setSyncStatus('syncing', '上传到云端...');
+  try {
+    // 先清空云端，再批量插入
+    const { error: delErr } = await sbClient.from(TABLE).delete().neq('id', 0);
+    if (delErr) throw delErr;
+    const { error: insErr } = await sbClient.from(TABLE).insert(diaries);
+    if (insErr) throw insErr;
+    setSyncStatus('', '已同步 · ' + new Date().toLocaleTimeString());
+    showToast('⬆️ 已上传 ' + diaries.length + ' 篇日记到云端');
+  } catch (e) {
+    setSyncStatus('offline', '上传失败');
+    showToast('❌ 上传失败: ' + e.message);
+  }
+}
+
+async function forceSync() {
+  await syncFromCloud();
+}
+
+async function saveToCloud(diary) {
+  try {
+    const { error } = await sbClient.from(TABLE).upsert(diary);
+    if (error) throw error;
+  } catch (e) {
+    showToast('⚠️ 云端保存失败，数据已存本地');
+  }
+}
+
+async function deleteFromCloud(id) {
+  try {
+    await sbClient.from(TABLE).delete().eq('id', id);
+  } catch (e) { /* 静默 */ }
+}
+
+function renderCloudInfo() {
+  document.getElementById('cloudInfo').innerHTML = `
+    连接状态：${isOnline ? '🟢 在线' : '🔴 离线'}<br>
+    云端地址：${SUPABASE_URL}<br>
+    本地缓存：${diaries.length} 篇日记<br>
+    数据大小：${(JSON.stringify(diaries).length/1024).toFixed(1)} KB
+  `;
+}
+
+// ===== 保存 =====
+async function saveDiary() {
+  const date = document.getElementById('diary-date').value;
+  const title = document.getElementById('diary-title').value.trim();
+  const content = document.getElementById('diary-content').value.trim();
+  if (!title && !content) { alert('请写点什么吧~'); return; }
+
+  setSyncStatus('syncing', '保存中...');
+  if (editingId !== null) {
+    const updated = { ...diaries[editingId], date, title, content, mood: selectedMood, weather: selectedWeather, tags: currentTags, updated: new Date().toISOString() };
+    diaries[editingId] = updated;
+    await saveToCloud(updated);
+    editingId = null;
+  } else {
+    const newDiary = { id: Date.now(), date, title, content, mood: selectedMood, weather: selectedWeather, tags: currentTags, pinned: false, created: new Date().toISOString() };
+    diaries.push(newDiary);
+    await saveToCloud(newDiary);
+  }
+  localStorage.setItem('diaries', JSON.stringify(diaries));
+  localStorage.removeItem('diary-draft');
+  document.getElementById('draftBadge').style.display = 'none';
+  clearForm();
+  setSyncStatus('', '已同步 · ' + new Date().toLocaleTimeString());
+  showToast('✅ 保存成功！');
+}
+
+function clearForm() {
+  document.getElementById('diary-title').value = '';
+  document.getElementById('diary-content').value = '';
+  document.getElementById('diary-date').valueAsDate = new Date();
+  document.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('selected'));
+  selectedMood = ''; selectedWeather = ''; currentTags = [];
+  renderTags(); updateWordCount();
+  editingId = null;
+  document.getElementById('draftBadge').style.display = 'none';
+}
+
+function editDiary(id) {
+  const d = diaries.find(x => x.id === id);
+  if (!d) return;
+  document.getElementById('diary-date').value = d.date;
+  document.getElementById('diary-title').value = d.title || '';
+  document.getElementById('diary-content').value = d.content || '';
+  document.querySelectorAll('.mood-row .emoji-btn').forEach(b => b.classList.toggle('selected', b.dataset.mood === d.mood));
+  document.querySelectorAll('.weather-row .emoji-btn').forEach(b => b.classList.toggle('selected', b.dataset.weather === d.weather));
+  selectedMood = d.mood || ''; selectedWeather = d.weather || '';
+  currentTags = [...(d.tags || [])]; renderTags(); updateWordCount();
+  editingId = diaries.indexOf(d);
+  switchTab('write', document.querySelectorAll('.tab-btn')[0]);
+}
+
+async function deleteDiary(id) {
+  if (!confirm('确定删除这篇日记吗？')) return;
+  diaries = diaries.filter(x => x.id !== id);
+  localStorage.setItem('diaries', JSON.stringify(diaries));
+  await deleteFromCloud(id);
+  renderList();
+  showToast('🗑️ 已删除');
+}
+
+async function togglePin(id) {
+  const d = diaries.find(x => x.id === id);
+  if (d) {
+    d.pinned = !d.pinned;
+    localStorage.setItem('diaries', JSON.stringify(diaries));
+    await saveToCloud(d);
+    renderList();
+  }
+}
+
+function copyDiary(id) {
+  const d = diaries.find(x => x.id === id);
+  if (!d) return;
+  const text = `【${d.title || '无标题'}】\n📅 ${d.date} ${d.mood || ''} ${d.weather || ''}\n${d.tags ? d.tags.map(t=>'#'+t).join(' ') : ''}\n\n${d.content}`;
+  navigator.clipboard.writeText(text).then(() => showToast('📋 已复制'));
+}
+
+// ===== 列表渲染 =====
+function renderList() {
+  const keyword = document.getElementById('search').value.toLowerCase();
+  const fm = document.getElementById('filterMood').value;
+  const ft = document.getElementById('filterTag').value;
+  const sort = document.getElementById('filterSort').value;
+
+  const allTags = [...new Set(diaries.flatMap(d => d.tags || []))];
+  const tagSel = document.getElementById('filterTag');
+  const curTag = tagSel.value;
+  tagSel.innerHTML = '<option value="">所有标签</option>' + allTags.map(t => `<option value="${t}" ${t===curTag?'selected':''}>#${t}</option>`).join('');
+
+  let filtered = diaries.filter(d =>
+    (!keyword || (d.title||'').toLowerCase().includes(keyword) || (d.content||'').toLowerCase().includes(keyword)) &&
+    (!fm || d.mood === fm) &&
+    (!ft || (d.tags||[]).includes(ft))
+  );
+  filtered.sort((a,b) => (b.pinned?1:0) - (a.pinned?1:0));
+  if (sort === 'date-desc') filtered.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  else if (sort === 'date-asc') filtered.sort((a,b) => (a.date||'').localeCompare(b.date||''));
+  else if (sort === 'len-desc') filtered.sort((a,b) => (b.content||'').length - (a.content||'').length);
+  filtered.sort((a,b) => (b.pinned?1:0) - (a.pinned?1:0));
+
+  const list = document.getElementById('diary-list');
+  const stats = document.getElementById('stats');
+  const totalDays = new Set(diaries.map(d => d.date)).size;
+  const happy = diaries.filter(d => ['😊','😍','🎉'].includes(d.mood)).length;
+  const totalWords = diaries.reduce((s,d) => s + (d.content||'').length, 0);
+  stats.innerHTML = `
+    <div class="stat-card"><div class="num">${diaries.length}</div><div class="label">篇日记</div></div>
+    <div class="stat-card"><div class="num">${totalDays}</div><div class="label">天记录</div></div>
+    <div class="stat-card"><div class="num">${happy}</div><div class="label">开心时刻</div></div>
+    <div class="stat-card"><div class="num">${totalWords}</div><div class="label">总字数</div></div>
+  `;
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty">📭 没有匹配的日记</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(d => `
+    <div class="diary-item ${d.pinned?'pinned':''}">
+      <div class="meta">
+        <span class="date">📅 ${d.date || '未设置'} ${d.pinned?'📌':''}</span>
+        <span class="mood-weather">${d.mood || ''} ${d.weather || ''}</span>
+      </div>
+      ${d.title ? `<h3>${escapeHtml(d.title)}</h3>` : ''}
+      <div class="content">${escapeHtml(d.content)}</div>
+      ${d.tags && d.tags.length ? `<div class="tags">${d.tags.map(t=>`<span>#${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+      <div class="actions">
+        <button class="btn-edit" onclick="editDiary(${d.id})">✏️ 编辑</button>
+        <button class="btn-del" onclick="deleteDiary(${d.id})">🗑 删除</button>
+        <button class="btn-pin" onclick="togglePin(${d.id})">${d.pinned?'取消置顶':'📌 置顶'}</button>
+        <button class="btn-copy" onclick="copyDiary(${d.id})">📋 复制</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ===== 日历 =====
+function renderCalendar() {
+  const y = calDate.getFullYear(), m = calDate.getMonth();
+  document.getElementById('calTitle').textContent = `${y}年 ${m+1}月`;
+  const first = new Date(y, m, 1).getDay();
+  const days = new Date(y, m+1, 0).getDate();
+  const today = new Date();
+  const diaryDates = {};
+  diaries.forEach(d => { if (d.date) { diaryDates[d.date] = (diaryDates[d.date]||0)+1; } });
+
+  let html = '';
+  const prevDays = new Date(y, m, 0).getDate();
+  for (let i = first-1; i >= 0; i--) {
+    html += `<td><div class="cal-day other-month">${prevDays - i}</div></td>`;
+  }
+  for (let d = 1; d <= days; d++) {
+    const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const has = diaryDates[ds];
+    const isToday = today.getFullYear()===y && today.getMonth()===m && today.getDate()===d;
+    html += `<td><div class="cal-day ${has?'has-diary':''} ${isToday?'today':''}" onclick="showDayDiaries('${ds}')">${d}${has?`<div class="dot"></div>`:''}</div></td>`;
+    if ((first + d) % 7 === 0) html += '</tr><tr>';
+  }
+  const total = first + days;
+  const remain = (7 - total % 7) % 7;
+  for (let i = 1; i <= remain; i++) {
+    html += `<td><div class="cal-day other-month">${i}</div></td>`;
+  }
+  document.getElementById('calBody').innerHTML = '<tr>' + html + '</tr>';
+  document.getElementById('calDayDiaries').innerHTML = '';
+}
+function changeMonth(delta) {
+  calDate.setMonth(calDate.getMonth() + delta);
+  renderCalendar();
+}
+function showDayDiaries(ds) {
+  const items = diaries.filter(d => d.date === ds);
+  const box = document.getElementById('calDayDiaries');
+  if (items.length === 0) {
+    box.innerHTML = `<div class="empty">📭 ${ds} 没有日记</div>`;
+    return;
+  }
+  box.innerHTML = `<h3 style="margin-bottom:12px;color:var(--primary)">📌 ${ds} 的日记</h3>` + items.map(d => `
+    <div class="diary-item">
+      <div class="meta"><span class="date">📅 ${d.date}</span><span class="mood-weather">${d.mood||''} ${d.weather||''}</span></div>
+      ${d.title?`<h3>${escapeHtml(d.title)}</h3>`:''}
+      <div class="content">${escapeHtml(d.content)}</div>
+    </div>
+  `).join('');
+}
+
+// ===== 设置页统计 =====
+function renderSettingsStats() {
+  const totalWords = diaries.reduce((s,d) => s + (d.content||'').length, 0);
+  const allTags = [...new Set(diaries.flatMap(d => d.tags || []))];
+  const moods = {};
+  diaries.forEach(d => { if (d.mood) moods[d.mood] = (moods[d.mood]||0)+1; });
+  const topMood = Object.entries(moods).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('settingsStats').innerHTML = `
+    总日记数：${diaries.length} 篇<br>
+    总字数：${totalWords} 字<br>
+    平均每篇：${diaries.length ? Math.round(totalWords/diaries.length) : 0} 字<br>
+    标签数：${allTags.length} 个<br>
+    最常用心情：${topMood ? topMood[0] + ' (' + topMood[1] + '次)' : '无'}<br>
+    数据大小：${(JSON.stringify(diaries).length/1024).toFixed(1)} KB
+  `;
+}
+
+// ===== 导出导入 =====
+function exportData() {
+  const blob = new Blob([JSON.stringify(diaries, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `diary-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+function exportTxt() {
+  const txt = diaries.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(d =>
+    `════════════════════════\n${d.date} ${d.mood||''} ${d.weather||''}\n【${d.title||'无标题'}】\n${d.tags?d.tags.map(t=>'#'+t).join(' '):''}\n\n${d.content}\n`
+  ).join('\n');
+  const blob = new Blob([txt], {type: 'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `diary-${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+}
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!Array.isArray(data)) throw 0;
+      if (confirm(`导入 ${data.length} 篇日记？将与现有数据合并。`)) {
+        diaries = [...diaries, ...data];
+        localStorage.setItem('diaries', JSON.stringify(diaries));
+        showToast('✅ 导入成功，可点击"上传到云端"同步');
+        renderList();
+      }
+    } catch { showToast('❌ 文件格式错误'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+async function clearAllData() {
+  if (!confirm('⚠️ 确定清空所有日记？此操作不可恢复！')) return;
+  if (!confirm('再次确认：真的要删除全部日记吗？（含云端）')) return;
+  try { await sbClient.from(TABLE).delete().neq('id', 0); } catch(e){}
+  diaries = [];
+  localStorage.setItem('diaries', '[]');
+  showToast('已清空');
+  renderList();
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+// ===== 网络状态监听 =====
+window.addEventListener('online', () => { isOnline = true; showToast('🌐 网络已恢复'); syncFromCloud(); });
+window.addEventListener('offline', () => { isOnline = false; setSyncStatus('offline', '离线模式'); });
+
+// ===== 初始化 =====
+loadDraft();
+// 启动时从云端拉取
+syncFromCloud();
+</script>
+</body>
+</html>
